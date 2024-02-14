@@ -190,8 +190,8 @@ class Predictor(BasePredictor):
         num_steps: int = Input(
             description="Number of iterations to run the model for.",
             ge=1,
-            le=15000,
-            default=12500,
+            le=10000,
+            default=5000,
         ),
         seed: int = Input(
             description="The seed to use for the generation. If not specified, a random value will be used.",
