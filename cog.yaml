@@ -85,3 +85,5 @@ build:
 
 # predict.py defines how predictions are run on your model
 predict: "predict.py:Predictor"
+
+image: r8.im/jd7h/dreamcraft3d
