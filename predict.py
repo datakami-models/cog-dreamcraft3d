@@ -54,6 +54,20 @@ import dreamcraft3d # we're circumventing threestudio's load_custom_modules()
 
 N_GPUS = 1
 
+CONFIG_PATHS = {
+    'nerf': "dreamcraft3d/configs/dreamcraft3d-coarse-nerf.yaml",
+    'neus': "dreamcraft3d/configs/dreamcraft3d-coarse-neus.yaml",
+    'geometry': "dreamcraft3d/configs/dreamcraft3d-geometry.yaml",
+    'texture': "dreamcraft3d/configs/dreamcraft3d-texture.yaml",
+}
+
+CONFIG_PATHS_FAST = {
+    'nerf': "dreamcraft3d/configs/dreamcraft3d-coarse-nerf-fast.yaml",
+    'neus': "dreamcraft3d/configs/dreamcraft3d-coarse-neus-fast.yaml",
+    'geometry': "dreamcraft3d/configs/dreamcraft3d-geometry-fast.yaml",
+    'texture': "dreamcraft3d/configs/dreamcraft3d-texture-fast.yaml",
+    }
+
 warnings.filterwarnings(module="controlnet_aux|torchvision", action="ignore")
 
 class Predictor(BasePredictor):
@@ -181,6 +195,10 @@ class Predictor(BasePredictor):
         prompt: str = Input(
             description="Prompt to generate a 3D object.",
         ),
+        use_fast_configs: bool = Input(
+            description="Use fast configuration files. This is less precise but much faster than the original configuration.",
+            default=True,
+        ),
         guidance_scale: float = Input(
             description="The scale of the guidance loss. Higher values will result in more accurate meshes but may also result in artifacts.",
             ge=1.0,
@@ -211,16 +229,12 @@ class Predictor(BasePredictor):
         
         pl.seed_everything(seed + get_rank(), workers=True)
 
-        config_paths = {
-        'nerf_fast': "dreamcraft3d/configs/dreamcraft3d-coarse-nerf-fast.yaml",
-        'neus_fast': "dreamcraft3d/configs/dreamcraft3d-coarse-neus-fast.yaml",
-        'geometry_fast': "dreamcraft3d/configs/dreamcraft3d-geometry-fast.yaml",
-        'texture_fast': "dreamcraft3d/configs/dreamcraft3d-texture-fast.yaml",
-        }
+        config_paths = CONFIG_PATHS
+        if use_fast_configs:
+          config_paths = CONFIG_PATHS_FAST
 
         # 0. Preprocess the image
-        print()
-        print("Preprocessing image...")
+        print("\n\nPreprocessing image...")
         image = image_utils.preprocess(
             image_path=str(image),
             model_path=BG_REMOVAL_MODEL_PATH,
@@ -230,10 +244,9 @@ class Predictor(BasePredictor):
             recenter=True,
         )
 
-        print()
-        print("Running step 1: NeRF")
+        print("\n\nRunning step 1: NeRF")
         trial_dir = self.train_model(
-            config_path=config_paths['nerf_fast'],
+            config_path=config_paths['nerf'],
             image_path=image,
             prompt=prompt,
             max_steps=num_steps,
@@ -246,10 +259,9 @@ class Predictor(BasePredictor):
         # will be of the form: "outputs/dreamcraft3d-coarse-nerf/$prompt@LAST/ckpts/last.ckpt"
         ckpt_path = os.path.join(trial_dir, "ckpts", "last.ckpt")
 
-        print()
-        print("Running step 2: NeuS")
+        print("\n\nRunning step 2: NeuS")
         trial_dir = self.train_model(
-            config_path=config_paths['neus_fast'],
+            config_path=config_paths['neus'],
             image_path=image,
             prompt=prompt,
             max_steps=num_steps,
@@ -263,10 +275,9 @@ class Predictor(BasePredictor):
         # will be of the form: "outputs/dreamcraft3d-coarse-neus/$prompt@LAST/ckpts/last.ckpt"
         ckpt_path = os.path.join(trial_dir, "ckpts", "last.ckpt")
 
-        print()
-        print("Running step 3: geometry refinement")
+        print("\n\nRunning step 3: geometry refinement")
         trial_dir = self.train_model(
-            config_path=config_paths['geometry_fast'],
+            config_path=config_paths['geometry'],
             image_path=image,
             prompt=prompt,
             max_steps=num_steps,
@@ -278,10 +289,9 @@ class Predictor(BasePredictor):
         
         ckpt_path = os.path.join(trial_dir, "ckpts", "last.ckpt")
 
-        print()
-        print("Running step 4: texture refinement")
+        print("\n\nRunning step 4: texture refinement")
         trial_dir = self.train_model(
-            config_path=config_paths['texture_fast'],
+            config_path=config_paths['texture'],
             image_path=image,
             prompt=prompt,
             max_steps=num_steps,
@@ -295,8 +305,7 @@ class Predictor(BasePredictor):
         parsed_config_path = os.path.join(trial_dir, "configs", "parsed.yaml")
 
         # Export the mesh
-        print()
-        print("Running step 5: Exporting meshes")
+        print("\n\nRunning step 5: Exporting meshes")
 
         export_obj_path = self.export_meshes(
             ckpt_path=ckpt_path,
