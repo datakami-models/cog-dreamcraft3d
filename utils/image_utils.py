@@ -104,6 +104,11 @@ def preprocess(image_path,
         carved_image = image
 
     mask = carved_image[..., -1] > 0
+
+    # DPT expects an image without alpha channel, so image.shape == 3
+    # if the loaded image already has an alpha channel, we throw that info away
+    if image.shape[2] == 4:
+      image = image[:,:,:3]
     
     # predict depth
     print(f"[INFO] depth estimation...")
