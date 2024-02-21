@@ -103,6 +103,7 @@ class Predictor(BasePredictor):
         geometry_convert_from,
     ) -> str:
         extras = [
+            "tag=replicate_user", # tag is used to create filenames. Defaults to the prompt, but this leads to long filenames
             f"data.image_path={image_path}",
             f"system.prompt_processor.prompt={prompt}",
             f"system.guidance.guidance_scale={guidance_scale}",
